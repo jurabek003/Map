@@ -11,11 +11,13 @@ import android.location.Location
 import android.location.LocationRequest
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.tasks.CancellationToken
 import uz.turgunboyevjurabek.map.databinding.ActivityMapsBinding
@@ -27,6 +29,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var locationPermissionGranted = false
     private var lastKnownLocation:Location?=null
+    val PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION=1
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,34 +44,22 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mapFragment.getMapAsync(this)
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-
-        binding.floatingCurrent.setOnClickListener {
-            showMyLocationOnMap()
-        }
-
+        
     }
 
-    private fun showMyLocationOnMap() {
-        // Check for location permissions
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED &&
-            ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+    private fun getLocationPermission() {
+        /*
+         * Request location permission, so that we can get the location of the
+         * device. The result of the permission request is handled by a callback,
+         * onRequestPermissionsResult.
+         */
+        if (ContextCompat.checkSelfPermission(this.applicationContext,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED) {
             locationPermissionGranted = true
         } else {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ),
-                1
-            )
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION)
         }
     }
 
@@ -94,9 +85,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
     private fun updateLocationUI() {
-        if (map == null) {
-            return
-        }
         try {
             if (locationPermissionGranted) {
                 map.isMyLocationEnabled = true
@@ -105,7 +93,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 map.isMyLocationEnabled = false
                 map.uiSettings.isMyLocationButtonEnabled = false
                 lastKnownLocation = null
-                showMyLocationOnMap()
+                getLocationPermission()
             }
         } catch (e: SecurityException) {
             Log.e("Exception: %s", e.message, e)
@@ -115,40 +103,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onMapReady(p0: GoogleMap) {
         this.map=p0
 
+        map.mapType = GoogleMap.MAP_TYPE_HYBRID
+
+        updateLocationUI()
         binding.floatingCurrent.setOnClickListener {
             getDeviceLocation()
-            updateLocationUI()
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
-                return@setOnClickListener
-            }
-            p0.isMyLocationEnabled=true
-            p0.uiSettings.isMyLocationButtonEnabled = true
-
-            val lon= p0.myLocation.longitude
-            val lat=p0.myLocation.latitude
-            val latLng=LatLng(lat,lon)
-            val title="My location"
-            p0.cameraPosition.zoom
-            p0.addMarker(MarkerOptions()
-                .position(latLng)
-                .title(title)
-            )
-            p0.moveCamera(CameraUpdateFactory.newLatLng(latLng))
-
         }
 
 
@@ -160,7 +119,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 val locationResult = fusedLocationClient.lastLocation
                 locationResult.addOnCompleteListener(this) { task ->
                     if (task.isSuccessful) {
-                        // Set the map's camera position to the current location of the device.
+
                         lastKnownLocation = task.result
                         if (lastKnownLocation != null) {
                             map.addMarker(
@@ -171,12 +130,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                             )
                             map.moveCamera(CameraUpdateFactory.newLatLngZoom(
                                 LatLng(lastKnownLocation!!.latitude,
-                                    lastKnownLocation!!.longitude), 10f))
+                                    lastKnownLocation!!.longitude), 15f))
                         }
                         map.isMyLocationEnabled=true
                         map.uiSettings.isMyLocationButtonEnabled = true
 
+
+
                     } else {
+                        Toast.makeText(this, "essiz", Toast.LENGTH_SHORT).show()
                         Log.d(TAG, "Current location is null. Using defaults.")
                         Log.e(TAG, "Exception: %s", task.exception)
                         map.moveCamera(CameraUpdateFactory
